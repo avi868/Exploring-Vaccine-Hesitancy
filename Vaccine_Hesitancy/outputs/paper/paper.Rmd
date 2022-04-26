@@ -1,0 +1,195 @@
+---
+title: "Reasons behind the hesitancy to take vaccines"
+subtitle: "A breakdown of the social and political reasons behind vaccine hesitancy"
+author: 
+  - Avinash Dindial
+thanks: "Code and data are available at: LINK."
+date: "`r format(Sys.time(), '%d %B %Y')`"
+abstract: "It is not new knowledge that vaccines work, but despite the overwhelming evidence hebind their safety, many are still reluctant to take them. This phenomenon has been brought to light during the COVID-19 pandemic and has been a hot topic of debate over the last couple years. Given that this debate has caused lots of public uproar due to mandatory vaccinations etc., this paper seeks to provide some reasoning,however unfounded, as to why some are still hesitant to take vaccines. This paper seeks to develop a model that gives the best predictors of vaccine hesitancy by offering different factors that lead to vaccine hesitancy other than lack of knowledge. These predictors can then be used for better tailored information to these hesitant groups; not forcing upon them to take the vaccines but offering a different perspective based on their views."
+output:
+  bookdown::pdf_document2
+toc: FALSE
+bibliography: references.bib
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(car)
+library(tidyverse)
+library(ggplot2)
+library(leaps)
+Vaccine_Hesitancy <- read_csv(here::here("Vaccine_Hesitancy/inputs/data/mturk_vaccine_hesitancy.csv"))
+
+```
+
+# Introduction
+
+## Background Information 
+The advent of vaccines has brought upon a great relief to our medical systems around the world. Perhaps one of the greatest victories of implementation of vaccinations is in the case of polio. In the early 1900's while other deadly diseases such as tuberculosis were declining, polio seemed to reach epidemic proportions. However, due to mass vaccination exercises, polio was essentially eradicated in the early 1990's. This seems to be enough proof that vaccines work, there seems to be more hesitancy now than ever before. Many of the pro-vaccine population sometimes bully this hesitant population, dismissing them as ill-informed or ignorant but vaccine hesitancy is much more complex and encompasses more than knowledge deficit [@citeshen]. Of course it is easy to see where pro-vaxxers are coming from as vaccines help us achieve herd immunity which prevents the spread of contagious diseases. Those who oppose vaccinations are therefore wrongly perceived as being selfish for not wanting to do what is best for the population. I argue this constant back and forth argument as to who is right simply slows down the overall progress. This results in a segregation of the population, especially given mandatory vaccinations as job requirements etc. If you do not want to take the vaccine, it is entirely possible you may not be allowed in certain places, be denied job opportunities etc. This can easily be seen as a form of discrimination. It seems that providing evidence based information to the hesitant population would be effective, however evidence suggest they do not accept this information, no matter how convincing the evidence may be [@citereuben].To overcome this, it seems we have to find alternative methods such as building trust and implementing other emotional,rather than factual, tactics. 
+This paper seeks to build a regression model, using the best predictors based on their statistical significance, which may help explain why a person may be hesitant to take vaccines. 
+
+## Paper outline
+This paper is organized as follows: Section \@ref(data) introduces the data-set used in this paper and breaks down all variables used. In addition, this section also provides a full EDA (explanatory data analysis) on this data. Section \@ref(model) attempts to provide a model for predicting vaccine hesitancy using multiple linear regression. This model would be influenced by the data but also drawing upon relevant literature. This section would also try to validate this model by splitting the data into test and training data-sets and also checking for any violations of model assumptions. Once the model is properly validated, Section \@ref(results) would further display graphs and tables that back up the model while Section \@ref(discussion) gives explanations of the results. Graphs were plotted in R [@citeR] using ggplot [@citeggplot]. In addition tidyverse [@citetidy] was used to clean and manipulate the data. 
+
+
+
+
+
+# Data
+
+## Data Collection
+Data was collected using Qualitrics software. Participants were recruited using Amazon MTurk and was compensated for their time. This survey was also approved by the University of Toronto board of ethics. After excluding non-citizens of the U.S and Canada, this data-set contained 484 observations. Respondents were given questions and in some cases had to rank or quantify the strength of their beliefs on a scale.
+
+## Variables 
+There are 14 variables in this data-set:
+
+
+- ID is a unique identifier for each respondent
+
+
+- sex is the sex of the respondent 
+
+
+- education is the education level following a 9-point system. They are ranked from "No formal education", "Some High School diploma or equivalent", "Some College", "Some college degree", "Some university", "Bachelors", "Masters" and "PhD". This is recorded as numeric integers with 1 representing "No formal education" and 9 representing "PhD". 
+
+
+- age of respondent 
+
+
+- religiosity, ranked on a scale of 1 to 7 with 7 being highly religious.
+
+
+- politics corresponding the the political views of the respondent. It is ranked in a 7 point scale with the higher numbers being more conservative.
+
+
+- pacv_final is a scale of 1-100 where the higher the number the  respondent gives, the more they are unwilling to take the vaccine. 
+
+
+- distrust; this is broken into 3 categories of hospital, physician and surgeon. Ranked from 1-7, the higher the number, the more trust they have in healthcare.
+
+
+- disgust; this is broken up into 3 categories of pathogen, sexual and moral disgust. Ranked from 1-7, the higher the number, the more disgust the respondent claims.
+
+
+
+
+```{r eda1, fig.cap="Distribution of respondents' ages", echo = FALSE, message=FALSE, warning=FALSE}
+ggplot(data=Vaccine_Hesitancy)+geom_bar(mapping = aes(x=age))
+```
+
+```{r eda2, fig.cap="Distribution of respondents' political beliefs", echo=FALSE,message=FALSE, warning=FALSE}
+ggplot(data=Vaccine_Hesitancy)+geom_bar(mapping = aes(x=politics))
+```
+
+
+```{r eda3, fig.cap="Distribution of respondents' religious beliefs", echo=FALSE,message=FALSE, warning=FALSE}
+ggplot(data=Vaccine_Hesitancy)+geom_bar(mapping = aes(x=religiosity))
+```
+
+
+```{r eda4, fig.cap="Relationship between age and Vaccine Hesitancy", echo=FALSE,message=FALSE, warning=FALSE}
+scatterplot(pacv_final~age,xlab = "Age",ylab = "Hestitancy score", main="Relationship between age and Vaccine Hesitancy",  data=Vaccine_Hesitancy)
+
+
+```
+
+
+(Figure \@ref(fig:eda4)) shows the relationship age has with Vaccine hesitancy. It seems as if younger people are more likely to reject vaccines. This is a surprising result as younger people tend to be more educated as the current generation has the highest rate of college graduation in history. My bit of informed speculation as to why we got this result is due to the impact of social media, more specifically, the prevalence of false news. Although the younger generation is more educated, they are also more connected to the internet which can account for this result. 
+
+
+ 
+
+
+
+# Model
+##  Splitting the Data Set
+For the purpose of this paper, I will split the data-set into two halves: test and training data. The training data would be used to determining the model while the test data would be used to validate the model. This is done after the EDA and before building the model so that there would be no bias in the model. 
+```{r, echo=FALSE}
+train <- Vaccine_Hesitancy[sample(1:nrow(Vaccine_Hesitancy), 242, replace = F),]
+test <- Vaccine_Hesitancy[which(!(Vaccine_Hesitancy$ID %in% train$ID)),]
+
+```
+
+## Multiple Linear Regression 
+This method was used to determine a model for predicting hesitancy in this sample. To determine the final model, (backward) step-wise regression was used to determine the most influential variables. I began with the full model, using all possible predictor variables and remove the least significant one until I have arrived at a model where all variables are statistically significant. Although the adjusted R-squared value is low for this model, I do not think this would affect the model's ability to explain the data. Since the nature of Hesitancy is very subjective, there is not one correct model, rather we needed to determine the most significant factors that is likely to make someone hesitant about taking the vaccine. Therefore, we can then target this subset of the population in ways that they would respond to. For instance, religiosity was seen to be a statistically significant factor, so perhaps a way of getting through to religious people is to get religious leaders on board to help educate their followers. 
+
+```{r model, echo=FALSE,message=FALSE, warning= FALSE}
+full_model <- lm(pacv_final ~ sex + age + religiosity + education +politics + pathogen_disgust + sexual_disgust + moral_disgust + hospitals_trust + physicians_trust + surgeons_trust, data= train)
+best <- regsubsets(pacv_final~., data=train, nbest = 1)
+model <- lm(pacv_final ~ age + religiosity + education, data=train)
+
+
+```
+## Proposed Model 
+The model I propose in this paper: 
+
+$$Y_i = \beta_{0}+\beta_{1}X_{1}+\beta_{2}X_{2}+\beta_{3}X_{3} + \epsilon$$ 
+
+
+$Y_i$ indicates the degree to which a person is hesitant to be vaccinated, given in percentages. In our model, we obtained a $\beta_{0}$ value of 31.96 which is the y-intercept if we were to plot this function on a graph.Our model assumes three predictors which is represented by $X_{1}$ representing age, $X_{2}$ representing religiosity and $X_{3}$ representing education. Similarly, $\beta_{1}$, $\beta_{2}$ and $\beta_{3}$ are the changes to Y when $X_{1}$, $X_{2}$ and $X_{3}$ increase respectively. It should be noted the values of $X_{1}$ and $X_{2}$ are negative which means the higher a person ranks on these scales, the less hesitant to vaccines they would be on average. With respect to age, we see this result in Figure \@ref(fig:eda4) where younger people tend to be more hesitant in taking their vaccines. 
+
+
+
+## Model Validity
+Summaries are similar when fit to both test and training data. Using VIF or variance inflated functions, there appears to be no co linearity in our model.Below are the VIF values for each predictor in our model when used on the training and testing data-sets respectively. Usually a VIF value of 5 or greater indicates our model assumption was broken, in which case we would need to run model diagnostics. When looking at qqplot, to check for normality, graphs seem to indicate normality is conserved. Even though it is slightly curved, it does not seem to be significant. Given these validity checks, this model seems to be appropriate in explaining the data.
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+test_model <- lm(pacv_final ~ age + religiosity + education, data=test)
+vif(model)
+vif(test_model)
+qqnorm(rstandard(model))
+qqnorm(rstandard(test_model))
+
+```
+
+
+## Model Limitations
+
+The biggest downfall of this model is the fact that predictors were selected using backward step-wise regression. Predictors were selected automatically by R [@citeR] using the regsubsets function [@citeleaps]. This model cannot be applied to other populations since non-US and non-Canadian citizens as well as non-parents were not part of the original survey.   
+
+
+
+# Results
+The average age of respondents in this survey was 42 years old with an average education of having completed some University and being moderately religious with a mean of 3.8. The table above shows the disparity in hesitancy with respect to other potential factors. Along with Figure \@ref(fig:eda3) we can clearly see how religious beliefs impact a person's perception of taking vaccines.  
+```{r table1 , fig.cap= "Table showing subset of data",echo=FALSE, message=FALSE}
+dt <- Vaccine_Hesitancy[1:10, 1:7]
+kableExtra::kable(dt)%>%kableExtra::kable_styling(latex_options = "striped")
+```
+
+In all cases of trust in healthcare, it seems highly hesitant people also lack trust in healthcare systems including their family physician. This is a surprising result as 2/3 of Canadian parents believe their physician is the most trustworthy source of medical information [@citeshen].
+```{r, echo=FALSE, warning=FALSE}
+ggplot(data=Vaccine_Hesitancy,aes(x=hospitals_trust,y=pacv_final, color=group))+geom_boxplot()
+ggplot(data=Vaccine_Hesitancy,aes(x=physicians_trust,y=pacv_final, color=group))+geom_boxplot()
+ggplot(data=Vaccine_Hesitancy,aes(x=surgeons_trust,y=pacv_final, color=group))+geom_boxplot()
+
+```
+```{r, echo=FALSE, warning=FALSE}
+ggplot(data=Vaccine_Hesitancy,aes(x=pathogen_disgust,y=pacv_final, color=group))+geom_boxplot()
+ggplot(data=Vaccine_Hesitancy,aes(x=sexual_disgust,y=pacv_final, color=group))+geom_boxplot()
+ggplot(data=Vaccine_Hesitancy,aes(x=moral_disgust,y=pacv_final, color=group))+geom_boxplot()
+
+```
+
+
+In the case of disgust, more hesitant people are also  likely to be disgusted by the pathogen and sex. However, they tend to be less likely to be morally disgusted. 
+
+
+
+
+# Discussion
+
+## Strategies to address vaccine hesitancy
+As seen in the results, it seems as if vaccine hesitancy is not caused by just a lack of information. Lack of trust in healthcare systems also seem to play a huge role in this along with the impact of religion. In addition to this, age seems to play a statistically significant role in vaccine hesitancy. Younger people tend to be more hesitant to taking vaccines. This result also extends to the younger population as well as adolescents and children tend to also be more hesitant to taking vaccines [@citeabrams]. This results also extends past this dataset; in Japan it was seen that vaccine hesitancy was more prevalent in younger people than in older generation [@citekhan]. More religious people tend to be more conservative but it is unclear how this correlation ties in to not wanting to take the vaccine. It may be that religious beliefs pushes certain agendas such as Divine healing or promote alternative medicine than Western medicine. Perhaps the best way to reach those hesitant about taking their vaccines is through religious leaders. In the case of polio, the involvement of religious leaders showed a positive result as vaccine uptake increased [@citestrategies]. This phenomenon of religious intervention also coincides with lack of trust in the healthcare system. It seems as if religious people trust their religious leaders more than they do actual doctors. This deserves more attention and research to determine why this happens because religious leaders often are not medical experts but their followers trust them with giving medical advice. 
+
+## Outlook
+
+Data in this paper, along with similar data from other population as seen in [@citekhan], show vaccine hesitancy is not simply a lack of information. Indeed, some may even have all scientific knowledge necessary but still refuse to take vaccines. This paper has highlighted age, religion and education as potential factors that affect a person's willingness to take vaccines. As such, tailored efforts must be made in these groups. For instance, a target audience would be the younger generations. There needs to be more research done to determine why the most educated generation in history still disagrees with government and other authoritative information on vaccinations. The answer does not lie in providing quantitative evidence, rather we must find other approaches such as implementing the use of social media to target younger audiences. 
+
+## Weaknesses and Conclusion
+This survey required internet connection and basic computer literacy to complete. Therefore, this survey cannot generalize to the proportion of the population that cannot access the internet nor those who do not know how to use a computer. In addition, only parents were used in this study, so they may have certain biases or maintain psychologies that differ from non-parents. While these are valid limitations, the model outlined in this paper, I argue, still has large predictive power as similar predictors were found in a similar study in Japan. This means, despite cultural and other differences, the same predictors of age, education and religiosity still played a role in explaining vaccine hesitancy. 
+
+\newpage
+
+
+# References
+
+
